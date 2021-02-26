@@ -17,3 +17,9 @@ export type ResponseInterceptor = [
 export interface HttpService {
   new (...args: any[]): {};
 }
+
+export interface DryAxiosConfig extends AxiosRequestConfig {
+  /** Determine if axios response should be preserved or map to response.data (default: false)*/
+  preserveAxiosResponse?: boolean,
+  map?: <ResponseData, MappedData>(response: ResponseData) => MappedData,
+}

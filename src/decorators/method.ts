@@ -7,7 +7,6 @@
 
 import {
   AxiosInstance,
-  AxiosRequestConfig,
   AxiosResponse,
   Method,
 } from 'axios';
@@ -21,9 +20,9 @@ import {
   AxiosMetadataKey,
   JwtMetadataKey,
 } from '../constants';
-import { ArgumentMap } from '../types';
+import { ArgumentMap, DryAxiosConfig } from '../types';
 
-function createApi(endpoint: string = '/', method: Method, config: AxiosRequestConfig = {}) {
+function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfig = {}) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     descriptor.value = function<T> (...args: any[]): Promise<AxiosResponse<T>> {
       // prepend url with '/'
@@ -69,7 +68,15 @@ function createApi(endpoint: string = '/', method: Method, config: AxiosRequestC
         },
       }, config);
 
-      return axios.request(requestConfig);
+      const response = axios.request(requestConfig);
+      if (config.preserveAxiosResponse) return response;
+      else if (config.map) {
+        return response
+        .then(response => new Promise(
+          (resolve) => resolve(config.map?.(response.data) ?? response.data),
+        ));
+      }
+      else return response.then(response => new Promise((resolve) => resolve(response.data)));
     };
     return descriptor;
   };
@@ -81,7 +88,7 @@ function createApi(endpoint: string = '/', method: Method, config: AxiosRequestC
  *
  * @param {string} endpoint Method endpoint.
  */
-export function Get(endpoint: string, config?: AxiosRequestConfig) {
+export function Get(endpoint: string, config?: DryAxiosConfig) {
   return createApi(endpoint, 'GET', config);
 }
 
@@ -91,7 +98,7 @@ export function Get(endpoint: string, config?: AxiosRequestConfig) {
  *
  * @param {string} endpoint Method endpoint.
  */
-export function Post(endpoint: string, config?: AxiosRequestConfig) {
+export function Post(endpoint: string, config?: DryAxiosConfig) {
   return createApi(endpoint, 'POST', config);
 }
 
@@ -101,7 +108,7 @@ export function Post(endpoint: string, config?: AxiosRequestConfig) {
  *
  * @param {string} endpoint Method endpoint.
  */
-export function Put(endpoint: string, config?: AxiosRequestConfig) {
+export function Put(endpoint: string, config?: DryAxiosConfig) {
   return createApi(endpoint, 'PUT', config);
 }
 
@@ -111,7 +118,7 @@ export function Put(endpoint: string, config?: AxiosRequestConfig) {
  *
  * @param {string} endpoint Method endpoint.
  */
-export function Patch(endpoint: string, config?: AxiosRequestConfig) {
+export function Patch(endpoint: string, config?: DryAxiosConfig) {
   return createApi(endpoint, 'PATCH', config);
 }
 
@@ -121,7 +128,7 @@ export function Patch(endpoint: string, config?: AxiosRequestConfig) {
  *
  * @param {string} endpoint Method endpoint.
  */
-export function Delete(endpoint: string, config?: AxiosRequestConfig) {
+export function Delete(endpoint: string, config?: DryAxiosConfig) {
   return createApi(endpoint, 'DELETE', config);
 }
 
