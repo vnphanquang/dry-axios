@@ -70,13 +70,13 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
 
       const response = axios.request(requestConfig);
       if (config.preserveAxiosResponse) return response;
-      else if (config.map) {
+      if (config.map) {
         return response
-        .then(response => new Promise(
-          (resolve) => resolve(config.map?.(response.data) ?? response.data),
-        ));
+          .then((res) => new Promise(
+            (resolve) => resolve(config.map?.(res.data) ?? res.data),
+          ));
       }
-      else return response.then(response => new Promise((resolve) => resolve(response.data)));
+      return response.then((res) => new Promise((resolve) => resolve(res.data)));
     };
     return descriptor;
   };
