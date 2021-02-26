@@ -21,6 +21,7 @@ import {
  * Http Class decorator
  * Indicates that this class is an Http Axios wrapper service.
  *
+ * @param {AxiosStatic} axios axios static (usually from "import axios from 'axios'"")
  * @param {AxiosRequestConfig} config axios config passed to axios.create
  * @param {RequestInterceptor[]} reqInterceptors axios request interceptors
  * @param {ResponseInterceptor[]} resInterceptors axios response interceptors
