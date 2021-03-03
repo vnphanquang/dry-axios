@@ -24,7 +24,7 @@ import { ArgumentMap, DryAxiosConfig } from '../types';
 
 function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfig = {}) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
-    descriptor.value = function<T> (...args: any[]): Promise<AxiosResponse<T>> {
+    descriptor.value = async function<T> (...args: any[]): Promise<AxiosResponse<T>> {
       // prepend url with '/'
       let resolvedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
@@ -53,8 +53,8 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
         body = args[bodyMetadata];
       }
 
-      const jwtResolver: () => string | null = Reflect.getOwnMetadata(JwtMetadataKey, target, methodName);
-      const jwt = jwtResolver && jwtResolver();
+      const jwtResolver: () => Promise<string> | null = Reflect.getOwnMetadata(JwtMetadataKey, target, methodName);
+      const jwt = jwtResolver && await jwtResolver();
 
       const axios: AxiosInstance = Reflect.getOwnMetadata(AxiosMetadataKey, target.constructor);
 
@@ -68,15 +68,12 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
         },
       }, config);
 
-      const response = axios.request(requestConfig);
+      const response = await axios.request(requestConfig);
       if (config.preserveAxiosResponse) return response;
       if (config.map) {
-        return response
-          .then((res) => new Promise(
-            (resolve) => resolve(config.map?.(res.data) ?? res.data),
-          ));
+        return config.map?.(response.data) ?? response.data;
       }
-      return response.then((res) => new Promise((resolve) => resolve(res.data)));
+      return response.data;
     };
     return descriptor;
   };
@@ -138,7 +135,7 @@ export function Delete(endpoint: string, config?: DryAxiosConfig) {
  *
  * @param {Function} resolver callback that will return jwt for api auth
  */
-export function Jwt(resolver: () => string) {
+export function Jwt(resolver: () => Promise<string>) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     Reflect.defineMetadata(JwtMetadataKey, resolver, target, methodName);
     return descriptor;
