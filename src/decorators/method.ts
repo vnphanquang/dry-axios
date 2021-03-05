@@ -186,7 +186,7 @@ export function Jwt(resolver: () => Promise<string> | any) {
 export function Sample(
   config: SampleConfig = SampleConfigDefault,
 ) {
-  return function (target: any, methodName: string, descriptor: PropertyDecorator) {
+  return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     config = {
       ...SampleConfigDefault,
       ...config,
