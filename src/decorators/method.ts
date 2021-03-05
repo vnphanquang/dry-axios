@@ -92,7 +92,7 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
 
       const response = await axios.request(requestConfig);
 
-      const shouldValidateAgainstSample = typeof sample.apply === 'function' ? await sample.apply() : sample.apply;
+      const shouldValidateAgainstSample = typeof sample.validate === 'function' ? await sample.validate() : sample.validate;
       if (shouldValidateAgainstSample) {
         const sampleResponse = await sample.resolver();
         validateResponseFormat(
