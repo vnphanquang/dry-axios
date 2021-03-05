@@ -169,7 +169,7 @@ export function Delete(endpoint: string, config?: DryAxiosConfig) {
  *
  * @param {Function} resolver (async/sync) callback that will return jwt for api auth
  */
-export function Jwt(resolver: () => Promise<string> | any) {
+export function Jwt(resolver: () => (Promise<string | undefined> | string | undefined)) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     Reflect.defineMetadata(JwtMetadataKey, resolver, target, methodName);
     return descriptor;
