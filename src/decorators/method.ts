@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-inferrable-types */
@@ -19,12 +20,30 @@ import {
   BodyMetadataKey,
   AxiosMetadataKey,
   JwtMetadataKey,
+  SampleMetadataKey,
+  SampleConfigDefault,
 } from '../constants';
-import { ArgumentMap, DryAxiosConfig } from '../types';
+import {
+  ArgumentMap, DryAxiosConfig, SampleConfig,
+} from '../types';
+import { validateResponseFormat } from '../utils';
 
 function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfig = {}) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
-    descriptor.value = async function<T> (...args: any[]): Promise<AxiosResponse<T>> {
+    descriptor.value = async function<T> (...args: any[]): Promise<AxiosResponse<T> | T> {
+      // resolve sample if specified
+      let sample: SampleConfig = SampleConfigDefault;
+      if (Reflect.hasOwnMetadata(SampleMetadataKey, target, methodName)) {
+        sample = Reflect.getOwnMetadata(SampleMetadataKey, target, methodName);
+      }
+
+      const shouldApplySample = typeof sample.apply === 'function' ? await sample.apply() : sample.apply;
+
+      if (shouldApplySample) {
+        const sampleResponse = await sample.resolver();
+        return sampleResponse;
+      }
+
       // prepend url with '/'
       let resolvedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
@@ -37,6 +56,7 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
         }
       }
 
+      // construct query object
       const queryMetadata: ArgumentMap = Reflect.getOwnMetadata(QueryMetadataKey, target, methodName);
       let queries: Record<string, string> | null = null;
       if (queryMetadata) {
@@ -47,12 +67,14 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
         }
       }
 
+      // construct body if any
       let body: Record<string, any> | null = null;
       if (Reflect.hasOwnMetadata(BodyMetadataKey, target, methodName)) {
         const bodyMetadata = Reflect.getOwnMetadata(BodyMetadataKey, target, methodName);
         body = args[bodyMetadata];
       }
 
+      // resolve jwt if specified
       const jwtResolver: () => Promise<string> | null = Reflect.getOwnMetadata(JwtMetadataKey, target, methodName);
       const jwt = jwtResolver && await jwtResolver();
 
@@ -69,6 +91,18 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
       }, config);
 
       const response = await axios.request(requestConfig);
+
+      const shouldValidateAgainstSample = typeof sample.apply === 'function' ? await sample.apply() : sample.apply;
+      if (shouldValidateAgainstSample) {
+        const sampleResponse = await sample.resolver();
+        validateResponseFormat(
+          sampleResponse,
+          response.data,
+          methodName,
+          sample.logger,
+        );
+      }
+
       if (config.preserveAxiosResponse) return response;
       if (config.map) {
         return config.map?.(response.data) ?? response.data;
@@ -133,11 +167,31 @@ export function Delete(endpoint: string, config?: DryAxiosConfig) {
  * Method decorator
  * Indicates that this method use jwt for authentication
  *
- * @param {Function} resolver callback that will return jwt for api auth
+ * @param {Function} resolver (async/sync) callback that will return jwt for api auth
  */
-export function Jwt(resolver: () => Promise<string>) {
+export function Jwt(resolver: () => Promise<string> | any) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     Reflect.defineMetadata(JwtMetadataKey, resolver, target, methodName);
+    return descriptor;
+  };
+}
+
+/**
+ * Method decorator
+ * For quick reference to sample response during development,
+ * and (optionally) apply mocked sample during testing.
+ *
+ * @param {SampleConfig} config determines what, how, when to resolve sample response
+ */
+export function Sample(
+  config: SampleConfig = SampleConfigDefault,
+) {
+  return function (target: any, methodName: string, descriptor: PropertyDecorator) {
+    config = {
+      ...SampleConfigDefault,
+      ...config,
+    };
+    Reflect.defineMetadata(SampleMetadataKey, config, target, methodName);
     return descriptor;
   };
 }
