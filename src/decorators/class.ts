@@ -9,12 +9,16 @@ import {
   AxiosRequestConfig,
   AxiosStatic,
 } from 'axios';
+import deepmerge from 'ts-deepmerge';
 
-import { AxiosMetadataKey } from '../constants';
 import {
+  AxiosMetadataKey,
+  DefaultHttpParameters,
+  RuntimeMetadataKey,
+} from '../constants';
+import {
+  HttpConfig,
   HttpService,
-  RequestInterceptor,
-  ResponseInterceptor,
 } from '../types';
 
 /**
@@ -22,37 +26,38 @@ import {
  * Indicates that this class is an Http Axios wrapper service.
  *
  * @param {AxiosStatic} axios axios static (usually from "import axios from 'axios'"")
- * @param {AxiosRequestConfig} config axios config passed to axios.create
- * @param {RequestInterceptor[]} reqInterceptors axios request interceptors
- * @param {ResponseInterceptor[]} resInterceptors axios response interceptors
+ * @param {HttpConfig} config
  */
-export function Http(
+export function Http<RuntimeConfig extends Record<string, unknown> = {}>(
   axios: AxiosStatic,
-  config: AxiosRequestConfig,
-  reqInterceptors: RequestInterceptor[] = [],
-  resInterceptors: ResponseInterceptor[] = [],
+  config: Partial<HttpConfig<RuntimeConfig>> = {},
 ) {
   return function<T extends HttpService>(constructor: T) {
     return class extends constructor {
       axiosInstance: AxiosInstance;
       axiosConfig: AxiosRequestConfig;
+      runtime: RuntimeConfig;
 
       constructor(...args: any[]) {
         super(...args);
 
+        const mergedConfig = deepmerge(DefaultHttpParameters, config);
+
         // create an axios instance with provided config
-        this.axiosConfig = config;
-        this.axiosInstance = axios.create(config);
+        this.axiosConfig = mergedConfig.axios;
+        this.axiosInstance = axios.create(this.axiosConfig);
+        this.runtime = mergedConfig.runtime;
 
         // hook in interceptors if any
-        for (const interceptor of reqInterceptors) {
+        for (const interceptor of mergedConfig.reqInterceptors) {
           this.axiosInstance.interceptors.request.use(...interceptor);
         }
-        for (const interceptor of resInterceptors) {
+        for (const interceptor of mergedConfig.resInterceptors) {
           this.axiosInstance.interceptors.response.use(...interceptor);
         }
 
         Reflect.defineMetadata(AxiosMetadataKey, this.axiosInstance, constructor);
+        Reflect.defineMetadata(RuntimeMetadataKey, this.runtime, constructor);
       }
     };
   };

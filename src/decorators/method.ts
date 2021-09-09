@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 /* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -21,7 +22,8 @@ import {
   AxiosMetadataKey,
   JwtMetadataKey,
   SampleMetadataKey,
-  SampleConfigDefault,
+  DefaultSampleConfig,
+  RuntimeMetadataKey,
 } from '../constants';
 import {
   ArgumentMap, DryAxiosConfig, SampleConfig,
@@ -32,12 +34,14 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     descriptor.value = async function<T> (...args: any[]): Promise<AxiosResponse<T> | T> {
       // resolve sample if specified
-      let sample: SampleConfig = SampleConfigDefault;
+      let sample: SampleConfig = DefaultSampleConfig;
       if (Reflect.hasOwnMetadata(SampleMetadataKey, target, methodName)) {
         sample = Reflect.getOwnMetadata(SampleMetadataKey, target, methodName);
       }
 
-      const shouldApplySample = typeof sample.apply === 'function' ? await sample.apply() : sample.apply;
+      const runtime = Reflect.getOwnMetadata(RuntimeMetadataKey, target.constructor);
+
+      const shouldApplySample = typeof sample.apply === 'function' ? await sample.apply(runtime) : sample.apply;
 
       if (shouldApplySample) {
         const sampleResponse = await sample.resolver();
@@ -92,7 +96,7 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
 
       const response = await axios.request(requestConfig);
 
-      const shouldValidateAgainstSample = typeof sample.validate === 'function' ? await sample.validate() : sample.validate;
+      const shouldValidateAgainstSample = typeof sample.validate === 'function' ? await sample.validate(runtime) : sample.validate;
       if (shouldValidateAgainstSample) {
         const sampleResponse = await sample.resolver();
         validateResponseFormat(
@@ -183,12 +187,12 @@ export function Jwt(resolver: () => (Promise<string | undefined> | string | unde
  *
  * @param {SampleConfig} config determines what, how, when to resolve sample response
  */
-export function Sample(
-  config: SampleConfig = SampleConfigDefault,
+export function Sample<Runtime extends Record<string, unknown> = {}>(
+  config: SampleConfig<Runtime> = DefaultSampleConfig,
 ) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     config = {
-      ...SampleConfigDefault,
+      ...DefaultSampleConfig,
       ...config,
     };
     Reflect.defineMetadata(SampleMetadataKey, config, target, methodName);
