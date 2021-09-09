@@ -79,8 +79,8 @@ function createApi(endpoint: string = '/', method: Method, config: DryAxiosConfi
       }
 
       // resolve jwt if specified
-      const jwtResolver: () => Promise<string> | null = Reflect.getOwnMetadata(JwtMetadataKey, target, methodName);
-      const jwt = jwtResolver && await jwtResolver();
+      const jwtResolver: (runtime: any) => Promise<string> | null = Reflect.getOwnMetadata(JwtMetadataKey, target, methodName);
+      const jwt = jwtResolver && await jwtResolver(runtime);
 
       const axios: AxiosInstance = Reflect.getOwnMetadata(AxiosMetadataKey, target.constructor);
 
@@ -173,7 +173,7 @@ export function Delete(endpoint: string, config?: DryAxiosConfig) {
  *
  * @param {Function} resolver (async/sync) callback that will return jwt for api auth
  */
-export function Jwt(resolver: () => (Promise<string | undefined> | string | undefined)) {
+export function Jwt<Runtime extends Record<string, unknown>>(resolver: (runtime: Runtime) => (Promise<string | undefined> | string | undefined)) {
   return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
     Reflect.defineMetadata(JwtMetadataKey, resolver, target, methodName);
     return descriptor;
